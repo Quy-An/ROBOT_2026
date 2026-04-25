@@ -1,0 +1,88 @@
+dependencies:
+  espp/base_component:
+    component_hash: 8ce5e30215ef1a664ae8967908c1755c43ea0338b6814ffe6a0ba94969412062
+    dependencies:
+    - name: espp/logger
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.36
+  espp/base_peripheral:
+    component_hash: 4930445404739cf2d6c3f0c58817710d13c65dfdcf3b09f2bf98fb6132376e1e
+    dependencies:
+    - name: espp/base_component
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.36
+  espp/format:
+    component_hash: 6a1b3b8548c903f52c1942c16d796bb946da7c2866e86d17cc8d44b746ee7753
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.36
+  espp/logger:
+    component_hash: afd6709bfc54ba3f88387a1070ffe470253451c1e761a11228019e98ef90a0d9
+    dependencies:
+    - name: espp/format
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.36
+  espp/vl53l:
+    component_hash: 3084376044c3c80e02b4b7fe09f82e41df74a032f19508998bbc214599f606b5
+    dependencies:
+    - name: espp/base_peripheral
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0'
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.36
+  espressif/mpu6050:
+    component_hash: 3370b55e3c1337c0a80c8cd833bf48c0ba61cf9f7d226856ae88abb61eba1d67
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.2.1
+  idf:
+    source:
+      type: idf
+    version: 5.4.2
+direct_dependencies:
+- espp/vl53l
+- espressif/mpu6050
+- idf
+manifest_hash: 19e1bae74c776539ca5b5e82d4625e3489b0d7a26779a526193fa95d19bb867d
+target: esp32
+version: 2.0.0
