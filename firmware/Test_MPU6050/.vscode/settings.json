@@ -1,5 +1,6 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
   "idf.openOcdConfigs": [
     "interface/ftdi/esp32_devkitj_v1.cfg",
     "target/esp32.cfg"
@@ -12,7 +13,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=d:\\IUH\\ROBOT_2026\\firmware\\Robot_Maze\\build"
+    "--compile-commands-dir=d:\\IUH\\ROBOT_2026\\firmware\\Test_MPU6050\\build"
   ],
   "idf.flashType": "UART",
   "idf.portWin": "COM7"

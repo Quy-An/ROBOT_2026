@@ -1,15 +1,137 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_err.h"
 #include "esp_log.h"
-#include "driver_mpu6050.h"
-#include "driver_mpu6050_interface.h"
+/**
+ * @brief user include header file
+ */
+#include "driver_mpu6050_dmp.h"
 
+/**
+ * @brief  TAG for logging
+ */
 static const char *TAG = "Main_App";
 
-i2c_master_bus_handle_t bus_handle;
-mpu6050_handle_t mpu6050_handle;
+/**
+ * @brief MPU6050 handle and I2C bus handle;
+ */
+i2c_master_bus_handle_t bus_handle = NULL;
+
+/**
+ * @brief variable to store read data
+ */
+static uint8_t (*g_gpio_irq)(void) = NULL;
+static int16_t gs_accel_raw[128][3];
+static float gs_accel_g[128][3];
+static int16_t gs_gyro_raw[128][3];      
+static float gs_gyro_dps[128][3];        
+static int32_t gs_quat[128][4];          
+static float gs_pitch[128];              
+static float gs_roll[128];                
+static float gs_yaw[128];                     
+
+static bool s_gpio_isr_service_installed = false;
+static TaskHandle_t s_mpu6050_irq_task_handle = NULL;
+
+static void mpu6050_irq_task(void *arg)
+{
+    (void)arg;
+
+    for (;;)
+    {
+        /* Wait until ISR notifies us that MPU6050 asserted INT. */
+        (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        if (g_gpio_irq != NULL)
+        {
+            /* Drain latched/queued interrupts while INT is active (active-low). */
+            while (gpio_get_level(INTERRUPT_MPU6050_IO) == 0)
+            {
+                (void)g_gpio_irq();
+            }
+        }
+
+        /* Re-enable GPIO interrupt for next event. */
+        (void)gpio_intr_enable(INTERRUPT_MPU6050_IO);
+    }
+}
+
+static void mpu6050_gpio_isr_handler(void *arg)
+{
+    (void)arg;
+
+    /* IMPORTANT: do NOT call I2C/driver functions here.
+     * Just notify a task; otherwise we can hit ISR WDT.
+     */
+    (void)gpio_intr_disable(INTERRUPT_MPU6050_IO);
+
+    if (s_mpu6050_irq_task_handle != NULL)
+    {
+        BaseType_t high_task_woken = pdFALSE;
+        vTaskNotifyGiveFromISR(s_mpu6050_irq_task_handle, &high_task_woken);
+        if (high_task_woken == pdTRUE)
+        {
+            portYIELD_FROM_ISR();
+        }
+    }
+}
+
+static int gpio_interrupt_init(void)
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << INTERRUPT_MPU6050_IO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_NEGEDGE,
+    };
+
+    esp_err_t err = gpio_config(&io_conf);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "gpio_config failed: %s", esp_err_to_name(err));
+        return 1;
+    }
+
+    if (!s_gpio_isr_service_installed)
+    {
+        err = gpio_install_isr_service(0);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
+        {
+            ESP_LOGE(TAG, "gpio_install_isr_service failed: %s", esp_err_to_name(err));
+            return 1;
+        }
+        s_gpio_isr_service_installed = true;
+    }
+
+    err = gpio_isr_handler_add(INTERRUPT_MPU6050_IO, mpu6050_gpio_isr_handler, NULL);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "gpio_isr_handler_add failed: %s", esp_err_to_name(err));
+        return 1;
+    }
+
+    /* Keep IRQ disabled until g_gpio_irq is assigned and DMP is initialized. */
+    (void)gpio_intr_disable(INTERRUPT_MPU6050_IO);
+    return 0;
+}
+
+static int gpio_interrupt_deinit(void)
+{
+    (void)gpio_intr_disable(INTERRUPT_MPU6050_IO);
+
+    esp_err_t err = gpio_isr_handler_remove(INTERRUPT_MPU6050_IO);
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "gpio_isr_handler_remove failed: %s", esp_err_to_name(err));
+        return 1;
+    }
+
+    return 0;
+}
 
 /**
  * @brief Initialize the I2C master bus
@@ -40,10 +162,10 @@ static void i2c_bus_init(void){
 static void i2c_scanner(void) {
     ESP_LOGW(TAG, "Scanning I2C bus...");
     int devices_found = 0;
-    for (uint8_t i = 1; i < 127; i++) {
-        esp_err_t ret = i2c_master_probe(bus_handle, i, 100);
+    for (uint8_t addr = 1; addr < 127; addr++) {
+        esp_err_t ret = i2c_master_probe(bus_handle, addr, 100);
         if (ret == ESP_OK) {
-            ESP_LOGW(TAG, "=> FOUND DEVICE AT ADDRESS: 0x%02X", i);
+            ESP_LOGW(TAG, "=> FOUND DEVICE AT ADDRESS: 0x%02X", addr);
             devices_found++;
         }
     }
@@ -54,179 +176,232 @@ static void i2c_scanner(void) {
 }
 
 /**
- * @brief Initialize MPU6050
+ * @brief dmp funtion
  */
-static void imu_init(void) {
-    uint8_t res;
-    
-    // Link interface functions
-    DRIVER_MPU6050_LINK_INIT(&mpu6050_handle, mpu6050_handle_t);
-    DRIVER_MPU6050_LINK_IIC_INIT(&mpu6050_handle, mpu6050_interface_iic_init);
-    DRIVER_MPU6050_LINK_IIC_DEINIT(&mpu6050_handle, mpu6050_interface_iic_deinit);
-    DRIVER_MPU6050_LINK_IIC_READ(&mpu6050_handle, mpu6050_interface_iic_read);
-    DRIVER_MPU6050_LINK_IIC_WRITE(&mpu6050_handle, mpu6050_interface_iic_write);
-    DRIVER_MPU6050_LINK_DELAY_MS(&mpu6050_handle, mpu6050_interface_delay_ms);
-    DRIVER_MPU6050_LINK_DEBUG_PRINT(&mpu6050_handle, mpu6050_interface_debug_print);
-    DRIVER_MPU6050_LINK_RECEIVE_CALLBACK(&mpu6050_handle, mpu6050_interface_receive_callback);
-
-    // Initialize MPU6050 AD0 Address (0xD0 for ad0 low, 0xD2 for ad0 high)
-    // We will default to LOW (0x68). If the scanner finds 0x69, you should change this to MPU6050_ADDRESS_AD0_HIGH
-    res = mpu6050_set_addr_pin(&mpu6050_handle, MPU6050_ADDRESS_AD0_LOW);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 set address failed");
-        return;
+static void a_receive_callback(uint8_t type)
+{
+    switch (type)
+    {
+        case MPU6050_INTERRUPT_MOTION :
+        {
+            mpu6050_interface_debug_print("mpu6050: irq motion.\n");
+            
+            break;
+        }
+        case MPU6050_INTERRUPT_FIFO_OVERFLOW :
+        {
+            mpu6050_interface_debug_print("mpu6050: irq fifo overflow.\n");
+            
+            break;
+        }
+        case MPU6050_INTERRUPT_I2C_MAST :
+        {
+            mpu6050_interface_debug_print("mpu6050: irq i2c master.\n");
+            
+            break;
+        }
+        case MPU6050_INTERRUPT_DMP :
+        {
+            mpu6050_interface_debug_print("mpu6050: irq dmp\n");
+            
+            break;
+        }
+        case MPU6050_INTERRUPT_DATA_READY :
+        {
+            mpu6050_interface_debug_print("mpu6050: irq data ready\n");
+            
+            break;
+        }
+        default :
+        {
+            mpu6050_interface_debug_print("mpu6050: irq unknown code.\n");
+            
+            break;
+        }
     }
+}
 
-    // Initialize MPU6050 hardware
-    res = mpu6050_init(&mpu6050_handle);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 init failed");
-        return;
+static void a_dmp_tap_callback(uint8_t count, uint8_t direction)
+{
+    switch (direction)
+    {
+        case MPU6050_DMP_TAP_X_UP :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq x up with %d.\n", count);
+            
+            break;
+        }
+        case MPU6050_DMP_TAP_X_DOWN :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq x down with %d.\n", count);
+            
+            break;
+        }
+        case MPU6050_DMP_TAP_Y_UP :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq y up with %d.\n", count);
+            
+            break;
+        }
+        case MPU6050_DMP_TAP_Y_DOWN :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq y down with %d.\n", count);
+            
+            break;
+        }
+        case MPU6050_DMP_TAP_Z_UP :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq z up with %d.\n", count);
+            
+            break;
+        }
+        case MPU6050_DMP_TAP_Z_DOWN :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq z down with %d.\n", count);
+            
+            break;
+        }
+        default :
+        {
+            mpu6050_interface_debug_print("mpu6050: tap irq unknown code.\n");
+            
+            break;
+        }
     }
+}
 
-    /* Follow LibDriver read_test init sequence */
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    res = mpu6050_set_sleep(&mpu6050_handle, MPU6050_BOOL_FALSE);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 disable sleep failed");
-        (void)mpu6050_deinit(&mpu6050_handle);
-        return;
+static void a_dmp_orient_callback(uint8_t orientation)
+{
+    switch (orientation)
+    {
+        case MPU6050_DMP_ORIENT_PORTRAIT :
+        {
+            mpu6050_interface_debug_print("mpu6050: orient irq portrait.\n");
+            
+            break;
+        }
+        case MPU6050_DMP_ORIENT_LANDSCAPE :
+        {
+            mpu6050_interface_debug_print("mpu6050: orient irq landscape.\n");
+            
+            break;
+        }
+        case MPU6050_DMP_ORIENT_REVERSE_PORTRAIT :
+        {
+            mpu6050_interface_debug_print("mpu6050: orient irq reverse portrait.\n");
+            
+            break;
+        }
+        case MPU6050_DMP_ORIENT_REVERSE_LANDSCAPE :
+        {
+            mpu6050_interface_debug_print("mpu6050: orient irq reverse landscape.\n");
+            
+            break;
+        }
+        default :
+        {
+            mpu6050_interface_debug_print("mpu6050: orient irq unknown code.\n");
+            
+            break;
+        }
     }
-
-    res = mpu6050_set_low_pass_filter(&mpu6050_handle, MPU6050_LOW_PASS_FILTER_3);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 set low pass filter failed");
-        (void)mpu6050_deinit(&mpu6050_handle);
-        return;
-    }
-
-    res = mpu6050_set_temperature_sensor(&mpu6050_handle, MPU6050_BOOL_TRUE);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 enable temperature sensor failed");
-        (void)mpu6050_deinit(&mpu6050_handle);
-        return;
-    }
-
-    res = mpu6050_set_cycle_wake_up(&mpu6050_handle, MPU6050_BOOL_FALSE);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 disable cycle wake up failed");
-        (void)mpu6050_deinit(&mpu6050_handle);
-        return;
-    }
-
-    /* read_test sets wake-up frequency even though cycle is disabled; keep it */
-    res = mpu6050_set_wake_up_frequency(&mpu6050_handle, MPU6050_WAKE_UP_FREQUENCY_1P25_HZ);
-    if (res != 0) {
-        ESP_LOGE(TAG, "MPU6050 set wake up frequency failed");
-        (void)mpu6050_deinit(&mpu6050_handle);
-        return;
-    }
-
-    /* Enable all accel/gyro axes */
-    if (mpu6050_set_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_X, MPU6050_BOOL_FALSE) != 0 ||
-        mpu6050_set_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Y, MPU6050_BOOL_FALSE) != 0 ||
-        mpu6050_set_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Z, MPU6050_BOOL_FALSE) != 0 ||
-        mpu6050_set_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_X, MPU6050_BOOL_FALSE) != 0 ||
-        mpu6050_set_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Y, MPU6050_BOOL_FALSE) != 0 ||
-        mpu6050_set_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Z, MPU6050_BOOL_FALSE) != 0) {
-        ESP_LOGE(TAG, "MPU6050 set standby mode failed");
-        (void)mpu6050_deinit(&mpu6050_handle);
-        return;
-    }
-
-    /* Disable self-test */
-    (void)mpu6050_set_gyroscope_test(&mpu6050_handle, MPU6050_AXIS_X, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_gyroscope_test(&mpu6050_handle, MPU6050_AXIS_Y, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_gyroscope_test(&mpu6050_handle, MPU6050_AXIS_Z, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_accelerometer_test(&mpu6050_handle, MPU6050_AXIS_X, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_accelerometer_test(&mpu6050_handle, MPU6050_AXIS_Y, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_accelerometer_test(&mpu6050_handle, MPU6050_AXIS_Z, MPU6050_BOOL_FALSE);
-
-    /* Disable FIFO and FIFO sources */
-    (void)mpu6050_set_fifo(&mpu6050_handle, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_fifo_enable(&mpu6050_handle, MPU6050_FIFO_TEMP, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_fifo_enable(&mpu6050_handle, MPU6050_FIFO_XG, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_fifo_enable(&mpu6050_handle, MPU6050_FIFO_YG, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_fifo_enable(&mpu6050_handle, MPU6050_FIFO_ZG, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_fifo_enable(&mpu6050_handle, MPU6050_FIFO_ACCEL, MPU6050_BOOL_FALSE);
-
-    /* Disable I2C master/bypass */
-    (void)mpu6050_set_iic_master(&mpu6050_handle, MPU6050_BOOL_FALSE);
-    (void)mpu6050_set_iic_bypass(&mpu6050_handle, MPU6050_BOOL_FALSE);
-
-    /* Set configuration: ±2000 dps and ±8g are good for robotics */
-    (void)mpu6050_set_gyroscope_range(&mpu6050_handle, MPU6050_GYROSCOPE_RANGE_2000DPS);
-    (void)mpu6050_set_accelerometer_range(&mpu6050_handle, MPU6050_ACCELEROMETER_RANGE_8G);
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    /* Post-init sanity checks */
-    // {
-    //     mpu6050_bool_t sleep_en = MPU6050_BOOL_TRUE;
-    //     mpu6050_bool_t cycle_en = MPU6050_BOOL_FALSE;
-    //     mpu6050_clock_source_t clk = MPU6050_CLOCK_SOURCE_INTERNAL_8MHZ;
-
-    //     if (mpu6050_get_sleep(&mpu6050_handle, &sleep_en) == 0 &&
-    //         mpu6050_get_cycle_wake_up(&mpu6050_handle, &cycle_en) == 0 &&
-    //         mpu6050_get_clock_source(&mpu6050_handle, &clk) == 0) {
-    //         ESP_LOGI(TAG, "MPU6050 state: sleep=%d cycle=%d clock_src=%d", (int)sleep_en, (int)cycle_en, (int)clk);
-    //     }
-
-    //     mpu6050_bool_t st = MPU6050_BOOL_FALSE;
-    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_X, &st) == 0) ESP_LOGI(TAG, "Standby ACC_X=%d", (int)st);
-    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Y, &st) == 0) ESP_LOGI(TAG, "Standby ACC_Y=%d", (int)st);
-    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Z, &st) == 0) ESP_LOGI(TAG, "Standby ACC_Z=%d", (int)st);
-    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_X, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_X=%d", (int)st);
-    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Y, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_Y=%d", (int)st);
-    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Z, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_Z=%d", (int)st);
-    // }
-    
-    ESP_LOGI(TAG, "MPU6050 initialized successfully.");
 }
 
 void app_main(void)
 {
-    // 1. Initialize the shared I2C bus
+    uint8_t res;
+    uint16_t len;
+    uint32_t cnt;
+
+    ESP_LOGI(TAG, "MPU6050 DMP demo starting...");
+
+    /* 1) Initialize the shared I2C bus (ESP-IDF v5.x i2c_master) */
     i2c_bus_init();
+    if (bus_handle == NULL)
+    {
+        ESP_LOGE(TAG, "I2C init failed, cannot continue.");
+        return;
+    }
     
     // // Scan for devices before initializing drivers to see hardware reality
     // i2c_scanner();
 
-    // 2. Initialize the MPU6050 sensor
-    imu_init();
-
-    // Data buffers
-    int16_t accel_raw[1][3] = {0}, gyro_raw[1][3] = {0};
-    float accel_g[1][3] = {0}, gyro_dps[1][3] = {0};
-    int16_t temp_raw = 0;
-    float temp_c = 0.0f;
-    uint16_t len = 1;
-
-    while (1) {
-        /* mpu6050_read uses len as input/output; keep it at 1 sample for this loop. */
-        len = 1;
-        // Read accel and gyro data from sensor
-        if (mpu6050_read(&mpu6050_handle, accel_raw, accel_g, gyro_raw, gyro_dps, &len) == 0) {
-            ESP_LOGI(TAG, "Raw: Accel=%d,%d,%d Gyro=%d,%d,%d (len=%u)",
-                     (int)accel_raw[0][0], (int)accel_raw[0][1], (int)accel_raw[0][2],
-                     (int)gyro_raw[0][0], (int)gyro_raw[0][1], (int)gyro_raw[0][2],
-                     (unsigned)len);
-
-            ESP_LOGI(TAG, "Accel(g): X=%0.2f Y=%0.2f Z=%0.2f | Gyro(dps): X=%0.2f Y=%0.2f Z=%0.2f",
-                     accel_g[0][0], accel_g[0][1], accel_g[0][2],
-                     gyro_dps[0][0], gyro_dps[0][1], gyro_dps[0][2]);
-        } else {
-            ESP_LOGW(TAG, "Failed to read MPU6050");
-        }
-
-        // Read temperature data from sensor
-        if (mpu6050_read_temperature(&mpu6050_handle, &temp_raw, &temp_c) == 0) {
-                ESP_LOGI(TAG, "Temp: raw=%d C=%0.2f", (int)temp_raw, (double)temp_c);
-        } else {
-            ESP_LOGW(TAG, "Failed to read MPU6050 temperature");
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(100)); // Delay between reads (10 Hz)
+    /* 2) Init GPIO interrupt line from MPU6050 INT pin */
+    if (gpio_interrupt_init() != 0)
+    {
+        ESP_LOGE(TAG, "GPIO interrupt init failed.");
+        return;
     }
 
+    /* Create a task to process MPU6050 interrupts in task context (safe for I2C). */
+    if (xTaskCreatePinnedToCore(mpu6050_irq_task,
+                               "mpu6050_irq",
+                               4096,
+                               NULL,
+                               10,
+                               &s_mpu6050_irq_task_handle,
+                               0) != pdPASS)
+    {
+        ESP_LOGE(TAG, "Failed to create mpu6050_irq task.");
+        (void)gpio_interrupt_deinit();
+        return;
+    }
+
+    /* Link ISR -> LibDriver IRQ handler */
+    g_gpio_irq = mpu6050_dmp_irq_handler;
+
+    /* 3) Init DMP example (LibDriver) */
+    res = mpu6050_dmp_init(MPU6050_ADDRESS_AD0_LOW, a_receive_callback,
+                           a_dmp_tap_callback, a_dmp_orient_callback);
+    if (res != 0)
+    {
+        ESP_LOGE(TAG, "mpu6050_dmp_init failed.");
+        g_gpio_irq = NULL;
+        (void)gpio_interrupt_deinit();
+        return;
+    }
+
+    (void)gpio_intr_enable(INTERRUPT_MPU6050_IO);
+
+    /* Give sensor/DMP some time after init */
+    mpu6050_interface_delay_ms(500);
+
+    while (1)
+    {
+        len = 128;
+
+        res = mpu6050_dmp_read_all(gs_accel_raw, gs_accel_g,
+                                  gs_gyro_raw, gs_gyro_dps,
+                                  gs_quat,
+                                  gs_pitch, gs_roll, gs_yaw,
+                                  &len);
+        if (res != 0)
+        {
+            ESP_LOGE(TAG, "mpu6050_dmp_read_all failed.");
+            break;
+        }
+
+        /* Main DMP outputs (degrees) */
+        ESP_LOGI(TAG, "DMP(len=%u): pitch=%0.2f roll=%0.2f yaw=%0.2f",
+                 (unsigned)len, (double)gs_pitch[0], (double)gs_roll[0], (double)gs_yaw[0]);
+
+        /* Optional: uncomment if you also want accel/gyro in the same loop */
+        // ESP_LOGI(TAG, "Accel(g): %0.2f %0.2f %0.2f | Gyro(dps): %0.2f %0.2f %0.2f",
+        //          (double)gs_accel_g[0][0], (double)gs_accel_g[0][1], (double)gs_accel_g[0][2],
+        //          (double)gs_gyro_dps[0][0], (double)gs_gyro_dps[0][1], (double)gs_gyro_dps[0][2]);
+
+        cnt = 0;
+        res = mpu6050_dmp_get_pedometer_counter(&cnt);
+        if (res == 0)
+        {
+            mpu6050_interface_debug_print("mpu6050: steps %lu.\n", (unsigned long)cnt);
+        }
+
+        mpu6050_interface_delay_ms(500);
+    }
+
+    /* cleanup on error */
+    (void)mpu6050_dmp_deinit();
+    g_gpio_irq = NULL;
+    (void)gpio_interrupt_deinit();
 }

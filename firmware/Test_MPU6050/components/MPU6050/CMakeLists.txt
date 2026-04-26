@@ -1,5 +1,6 @@
 set(srcs 
     "src/driver_mpu6050.c"
+    "src/driver_mpu6050_dmp.c"
     "src/driver_mpu6050_interface.c"
 )
 
