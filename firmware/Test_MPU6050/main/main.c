@@ -161,25 +161,25 @@ static void imu_init(void) {
     vTaskDelay(pdMS_TO_TICKS(100));
 
     /* Post-init sanity checks */
-    {
-        mpu6050_bool_t sleep_en = MPU6050_BOOL_TRUE;
-        mpu6050_bool_t cycle_en = MPU6050_BOOL_FALSE;
-        mpu6050_clock_source_t clk = MPU6050_CLOCK_SOURCE_INTERNAL_8MHZ;
+    // {
+    //     mpu6050_bool_t sleep_en = MPU6050_BOOL_TRUE;
+    //     mpu6050_bool_t cycle_en = MPU6050_BOOL_FALSE;
+    //     mpu6050_clock_source_t clk = MPU6050_CLOCK_SOURCE_INTERNAL_8MHZ;
 
-        if (mpu6050_get_sleep(&mpu6050_handle, &sleep_en) == 0 &&
-            mpu6050_get_cycle_wake_up(&mpu6050_handle, &cycle_en) == 0 &&
-            mpu6050_get_clock_source(&mpu6050_handle, &clk) == 0) {
-            ESP_LOGI(TAG, "MPU6050 state: sleep=%d cycle=%d clock_src=%d", (int)sleep_en, (int)cycle_en, (int)clk);
-        }
+    //     if (mpu6050_get_sleep(&mpu6050_handle, &sleep_en) == 0 &&
+    //         mpu6050_get_cycle_wake_up(&mpu6050_handle, &cycle_en) == 0 &&
+    //         mpu6050_get_clock_source(&mpu6050_handle, &clk) == 0) {
+    //         ESP_LOGI(TAG, "MPU6050 state: sleep=%d cycle=%d clock_src=%d", (int)sleep_en, (int)cycle_en, (int)clk);
+    //     }
 
-        mpu6050_bool_t st = MPU6050_BOOL_FALSE;
-        if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_X, &st) == 0) ESP_LOGI(TAG, "Standby ACC_X=%d", (int)st);
-        if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Y, &st) == 0) ESP_LOGI(TAG, "Standby ACC_Y=%d", (int)st);
-        if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Z, &st) == 0) ESP_LOGI(TAG, "Standby ACC_Z=%d", (int)st);
-        if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_X, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_X=%d", (int)st);
-        if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Y, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_Y=%d", (int)st);
-        if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Z, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_Z=%d", (int)st);
-    }
+    //     mpu6050_bool_t st = MPU6050_BOOL_FALSE;
+    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_X, &st) == 0) ESP_LOGI(TAG, "Standby ACC_X=%d", (int)st);
+    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Y, &st) == 0) ESP_LOGI(TAG, "Standby ACC_Y=%d", (int)st);
+    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_ACC_Z, &st) == 0) ESP_LOGI(TAG, "Standby ACC_Z=%d", (int)st);
+    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_X, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_X=%d", (int)st);
+    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Y, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_Y=%d", (int)st);
+    //     if (mpu6050_get_standby_mode(&mpu6050_handle, MPU6050_SOURCE_GYRO_Z, &st) == 0) ESP_LOGI(TAG, "Standby GYRO_Z=%d", (int)st);
+    // }
     
     ESP_LOGI(TAG, "MPU6050 initialized successfully.");
 }
@@ -189,8 +189,8 @@ void app_main(void)
     // 1. Initialize the shared I2C bus
     i2c_bus_init();
     
-    // Scan for devices before initializing drivers to see hardware reality
-    i2c_scanner();
+    // // Scan for devices before initializing drivers to see hardware reality
+    // i2c_scanner();
 
     // 2. Initialize the MPU6050 sensor
     imu_init();
@@ -198,46 +198,32 @@ void app_main(void)
     // Data buffers
     int16_t accel_raw[1][3] = {0}, gyro_raw[1][3] = {0};
     float accel_g[1][3] = {0}, gyro_dps[1][3] = {0};
+    int16_t temp_raw = 0;
+    float temp_c = 0.0f;
     uint16_t len = 1;
 
     while (1) {
         /* mpu6050_read uses len as input/output; keep it at 1 sample for this loop. */
         len = 1;
-        // Read data from sensor
+        // Read accel and gyro data from sensor
         if (mpu6050_read(&mpu6050_handle, accel_raw, accel_g, gyro_raw, gyro_dps, &len) == 0) {
             ESP_LOGI(TAG, "Raw: Accel=%d,%d,%d Gyro=%d,%d,%d (len=%u)",
                      (int)accel_raw[0][0], (int)accel_raw[0][1], (int)accel_raw[0][2],
                      (int)gyro_raw[0][0], (int)gyro_raw[0][1], (int)gyro_raw[0][2],
                      (unsigned)len);
 
-            if (accel_raw[0][0] == 0 && accel_raw[0][1] == 0 && accel_raw[0][2] == 0 &&
-                gyro_raw[0][0] == 0 && gyro_raw[0][1] == 0 && gyro_raw[0][2] == 0) {
-                uint8_t reg = 0x3B; /* ACCEL_XOUT_H */
-                uint8_t bytes[14] = {0};
-                uint8_t pwr = 0;
-                uint8_t who = 0;
-                if (mpu6050_interface_iic_read(mpu6050_handle.iic_addr, reg, bytes, sizeof(bytes)) == 0) {
-                    ESP_LOGW(TAG, "ACCEL_XOUT_H dump: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-                             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-                             bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13]);
-                }
-                if (mpu6050_interface_iic_read(mpu6050_handle.iic_addr, 0x6B, &pwr, 1) == 0 &&
-                    mpu6050_interface_iic_read(mpu6050_handle.iic_addr, 0x75, &who, 1) == 0) {
-                    ESP_LOGW(TAG, "Snapshot: WHO_AM_I=0x%02X PWR_MGMT_1=0x%02X", who, pwr);
-                }
-            }
-
-            int16_t temp_raw = 0;
-            float temp_c = 0.0f;
-            if (mpu6050_read_temperature(&mpu6050_handle, &temp_raw, &temp_c) == 0) {
-                ESP_LOGI(TAG, "Temp: raw=%d C=%0.2f", (int)temp_raw, (double)temp_c);
-            }
-
             ESP_LOGI(TAG, "Accel(g): X=%0.2f Y=%0.2f Z=%0.2f | Gyro(dps): X=%0.2f Y=%0.2f Z=%0.2f",
                      accel_g[0][0], accel_g[0][1], accel_g[0][2],
                      gyro_dps[0][0], gyro_dps[0][1], gyro_dps[0][2]);
         } else {
             ESP_LOGW(TAG, "Failed to read MPU6050");
+        }
+
+        // Read temperature data from sensor
+        if (mpu6050_read_temperature(&mpu6050_handle, &temp_raw, &temp_c) == 0) {
+                ESP_LOGI(TAG, "Temp: raw=%d C=%0.2f", (int)temp_raw, (double)temp_c);
+        } else {
+            ESP_LOGW(TAG, "Failed to read MPU6050 temperature");
         }
 
         vTaskDelay(pdMS_TO_TICKS(100)); // Delay between reads (10 Hz)
