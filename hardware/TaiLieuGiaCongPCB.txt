@@ -1,0 +1,35 @@
+HƯỚNG DẪN XUẤT FILE VÀ THÔNG SỐ KỸ THUẬT GIA CÔNG PCB (GERBER FILES)
+
+Nội dung: Tài liệu này chứa các lưu ý kỹ thuật quan trọng để gửi file Gerber cho đơn vị gia công mạch in.
+
+1. DANH SÁCH CÁC LỚP (LAYERS) CẦN THIẾT:
+Để gia công board đầy đủ, cần xuất các lớp sau:
+- Top/Bottom Copper (Đồng mặt trên/dưới)
+- SMT/SMB (Solder Mask Top/Bottom - Mặt nạ hàn)
+- SST/SSB (Silk Screen Top/Bottom - Lớp in chữ)
+- Drill (Lỗ khoan)
+- Đường biên (Mechanical/Outline)
+
+2. TIÊU CHUẨN KỸ THUẬT TỐI THIỂU:
+Dưới đây là các thông số giới hạn để đảm bảo chất lượng gia công:
+
+* Đường biên tối thiểu: 9 mil (0.23 mm)
+* Khoảng chừa đường biên nhỏ nhất: 10 mil (0.25 mm)
+* Kích thước lỗ Via (Lỗ nối lớp Top và Bottom):
+  - Tối thiểu: Khoan 0.3 mm / Pad 0.6 mm
+  - Khuyên dùng: Khoan 0.6 mm / Pad 1.0 mm
+* Khoảng cách tối thiểu giữa 2 đối tượng (Track-to-Track, Pad-to-Pad, v.v.): 9 mil (0.23 mm)
+* Khoảng cách phủ đồng (Copper Clearance): 20 mil (0.5 mm)
+* Độ rộng đường mạch tối thiểu: 8 mil (0.2 mm)
+* Kích thước chân linh kiện (Pad): Kích thước lỗ khoan + 0.6 mm
+* Độ dày nét chữ in (Silk Screen): 0.2 mm
+
+3. LƯU Ý TRƯỚC KHI GỬI FILE:
+- Xác định chính xác mặt cắm linh kiện và mặt hàn (đặc biệt đối với board 1 mặt).
+- Kiểm tra kỹ lỗi chạm chập (Short circuit) giữa các đối tượng.
+- Đảm bảo không còn đường mạch nào chưa chạy (Unrouted net).
+- Nén tất cả các file Gerber và file Drill vào một tệp .ZIP hoặc .RAR trước khi gửi cho dịch vụ gia công.
+
+4. CHÚ THÍCH VỀ FILE GERBER:
+- File Gerber là định dạng chuẩn công nghiệp dùng để truyền tải thông tin thiết kế mạch in đến các máy gia công tự động. 
+- Đây là định dạng tệp bắt buộc và duy nhất được sử dụng để gửi cho các đơn vị cung cấp dịch vụ đặt mạch (PCB manufacturing services).
