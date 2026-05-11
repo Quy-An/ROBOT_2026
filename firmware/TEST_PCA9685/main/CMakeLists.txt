@@ -5,5 +5,5 @@ idf_component_register(
         esp_driver_i2c 
         esp_adc 
         driver 
-        MPU6050
+        PCA9685
 )

@@ -4,6 +4,7 @@ idf_component_register(
     REQUIRES 
         esp_driver_i2c 
         esp_adc 
-        driver 
-        MPU6050
+        driver
+        esp_driver_ledc
+        BTS7960
 )

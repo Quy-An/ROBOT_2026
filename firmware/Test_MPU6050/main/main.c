@@ -18,7 +18,7 @@ static const char *TAG = "Main_App";
 /**
  * @brief MPU6050 handle and I2C bus handle;
  */
-i2c_master_bus_handle_t bus_handle = NULL;
+i2c_master_bus_handle_t i2c_bus_handle = NULL;
 
 /**
  * @brief variable to store read data
@@ -148,7 +148,7 @@ static void i2c_bus_init(void){
     };
 
     // Check if initializing bus handle correctly
-    esp_err_t err = i2c_new_master_bus(&i2c_mst_config, &bus_handle);
+    esp_err_t err = i2c_new_master_bus(&i2c_mst_config, &i2c_bus_handle);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "I2C Master Bus initialized successfully.");
     } else {
@@ -163,7 +163,7 @@ static void i2c_scanner(void) {
     ESP_LOGW(TAG, "Scanning I2C bus...");
     int devices_found = 0;
     for (uint8_t addr = 1; addr < 127; addr++) {
-        esp_err_t ret = i2c_master_probe(bus_handle, addr, 100);
+        esp_err_t ret = i2c_master_probe(i2c_bus_handle, addr, 100);
         if (ret == ESP_OK) {
             ESP_LOGW(TAG, "=> FOUND DEVICE AT ADDRESS: 0x%02X", addr);
             devices_found++;
@@ -317,7 +317,7 @@ void app_main(void)
 
     /* 1) Initialize the shared I2C bus (ESP-IDF v5.x i2c_master) */
     i2c_bus_init();
-    if (bus_handle == NULL)
+    if (i2c_bus_handle == NULL)
     {
         ESP_LOGE(TAG, "I2C init failed, cannot continue.");
         return;

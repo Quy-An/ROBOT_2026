@@ -1,0 +1,20 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.extensionActivationMode": "always",
+  "idf.openOcdConfigs": [
+    "interface/ftdi/esp32_devkitj_v1.cfg",
+    "target/esp32.cfg"
+  ],
+  "idf.portWin": "COM7",
+  "idf.currentSetup": "D:/Programs/Espressif/frameworks/esp-idf-v5.4.2/",
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32"
+  },
+  "clangd.path": "c:\\Users\\quyan\\esp\\tools\\esp-clang\\esp-18.1.2_20240912\\esp-clang\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=d:\\IUH\\ROBOT_2026\\firmware\\TEST_ROBOT_KINEMATICS\\build"
+  ],
+  "idf.flashType": "UART"
+}

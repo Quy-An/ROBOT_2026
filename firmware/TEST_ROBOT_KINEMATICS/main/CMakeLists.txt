@@ -1,9 +1,9 @@
 idf_component_register(
-    SRCS "main.c"
+    SRCS "robot_kinematics.c" "robot_controller.c" "main.c"
     INCLUDE_DIRS "."
     REQUIRES 
         esp_driver_i2c 
         esp_adc 
         driver 
-        MPU6050
+        PCA9685
 )
