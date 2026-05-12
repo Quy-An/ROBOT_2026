@@ -11,7 +11,7 @@
 #include "driver_pca9685_basic.h"
 #include "robot_kinematics.h"
 #include "robot_controller.h"
-#include "sensor_mpu6050.h"
+#include "robot_sensor.h"
 
 /**
  * @brief  TAG for logging
@@ -84,10 +84,8 @@ void app_main(void)
     /* 2) Initialize robot kinematics */
     kinematics_init();
 
-    /* 3) Initialize MPU6050 DMP */
-    if (mpu6050_controller_init() != 0) {
-        ESP_LOGE(TAG, "MPU6050 initialization failed.");
-    }
+    /* 3) Initialize robot sensor */
+    robot_sensor_init();
 
     /* 4) Start robot control task */
     robot_controller_task_start();
@@ -98,10 +96,6 @@ void app_main(void)
         // ESP_LOGI(TAG, "Moving forward");
         // robot_controller_set_velocity(0.8f, 0.0f);
         // vTaskDelay(pdMS_TO_TICKS(2000));
-        
-        float pitch, roll, yaw;
-        mpu6050_get_euler_angles(&pitch, &roll, &yaw);
-        ESP_LOGI(TAG, "Robot Angle: Pitch=%.2f, Roll=%.2f, Yaw=%.2f", pitch, roll, yaw);
 
         // Stop
         ESP_LOGI(TAG, "Stopping");

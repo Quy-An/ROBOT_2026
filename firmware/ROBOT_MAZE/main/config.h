@@ -20,7 +20,7 @@
  * @brief identify the IOs connected to the peripheral.
  */
 #define XSHUT_FRONT_IO                  GPIO_NUM_23     // XSHUT pin of the front VL53L0X
-#define INTERUPT_FRONT_IO                GPIO_NUM_22     // Interrupt pin of the front VL53L0X
+#define INTERUPT_FRONT_IO               GPIO_NUM_22     // Interrupt pin of the front VL53L0X
 
 #define XSHUT_FRONT_LEFT_IO             GPIO_NUM_32     // XSHUT pin of the front left VL53L0X
 #define INTERUPT_FRONT_LEFT_IO          GPIO_NUM_33     // Interrupt pin of the front left VL53L0X
@@ -41,11 +41,11 @@
 #define TCRT5000_RIGHT_ADC_CHANNEL      ADC2_CHANNEL_3  // ADC channel for the right TCRT5000
 #define TCRT5000_REAR_ADC_CHANNEL       ADC2_CHANNEL_4  // ADC channel for the rear TCRT5000
 #define TCRT5000_DETECT                 ADC2_CHANNEL_2  // ADC channel for the TCRT5000 used for detecting the opponent
- 
+
 #define PWM_RPWM_LEFT                   PCA9685_CHANNEL_0      // RPWM pin of the left motor
 #define PWM_LPWM_LEFT                   PCA9685_CHANNEL_1      // LPWM pin of the left motor
-#define PWM_RPWM_RIGHT                  PCA9685_CHANNEL_3      // RPWM pin of the right motor
-#define PWM_LPWM_RIGHT                  PCA9685_CHANNEL_2      // LPWM pin of the right motor
+#define PWM_RPWM_RIGHT                  PCA9685_CHANNEL_2      // RPWM pin of the right motor
+#define PWM_LPWM_RIGHT                  PCA9685_CHANNEL_3      // LPWM pin of the right motor
 
 
 

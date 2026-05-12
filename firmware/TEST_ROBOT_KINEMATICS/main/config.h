@@ -17,6 +17,14 @@
 #define I2C_MASTER_SDA_IO           GPIO_NUM_19
 
 /**
+ * @brief MPU6050 read mode
+ * - 1: Read only when MPU6050 INT triggers (recommended)
+ * - 0: Polling read every MPU6050_POLL_PERIOD_MS
+ */
+#define MPU6050_READ_USE_INTERRUPT  1
+#define MPU6050_POLL_PERIOD_MS      10
+
+/**
  * @brief identify the IOs connected to the peripheral.
  */
 #define XSHUT_FRONT_IO                  GPIO_NUM_23     // XSHUT pin of the front VL53L0X

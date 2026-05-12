@@ -1,8 +1,8 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
+  "idf.extensionActivationMode": "always",
   "idf.openOcdConfigs": [
-    "interface/ftdi/esp32_devkitj_v1.cfg",
-    "target/esp32.cfg"
+    "board/esp32-wrover-kit-3.3v.cfg"
   ],
   "idf.currentSetup": "D:/Programs/Espressif/frameworks/esp-idf-v5.4.2/",
   "idf.customExtraVars": {
@@ -12,7 +12,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=d:\\IUH\\ROBOT_2026\\firmware\\TEST_VL53L0X\\build"
+    "--compile-commands-dir=d:\\IUH\\ROBOT_2026\\firmware\\ROBOT_MAZE\\build"
   ],
   "idf.flashType": "UART",
   "idf.portWin": "COM7"

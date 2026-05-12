@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "robot_kinematics.c" "robot_controller.c" "sensor_mpu6050.c" "main.c"
+    SRCS "robot_kinematics.c" "robot_controller.c" "robot_sensor.c" "main.c"
     INCLUDE_DIRS "."
     REQUIRES 
         esp_driver_i2c 
