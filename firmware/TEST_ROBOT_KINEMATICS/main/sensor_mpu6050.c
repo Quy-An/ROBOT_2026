@@ -6,6 +6,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "driver_mpu6050_dmp.h"
+#include <math.h>
 
 static const char *TAG = "MPU6050_CTRL";
 
@@ -38,6 +39,40 @@ static float curr_roll = 0.0f;
 static float curr_yaw = 0.0f;
 static float curr_accel_g[3] = {0.0f, 0.0f, 0.0f};
 static float curr_gyro_dps[3] = {0.0f, 0.0f, 0.0f};
+
+/* --- Yaw drift mitigation (no magnetometer on MPU6050) ---
+ *
+ * DMP yaw is gyro-integrated and will drift over time. For a maze robot, this
+ * is dangerous because the controller may try to "correct" a drifting yaw even
+ * when the robot is physically still.
+ *
+ * Strategy:
+ * - Unwrap DMP yaw across +/-180 to a continuous yaw
+ * - When sensor looks stationary (low gyro + accel magnitude near 1g), absorb
+ *   DMP yaw changes into an offset so the *reported* yaw stays fixed.
+ */
+#ifndef MPU6050_STATIONARY_GYRO_THR_DPS
+#define MPU6050_STATIONARY_GYRO_THR_DPS 1.0f
+#endif
+
+#ifndef MPU6050_STATIONARY_ACCEL_MAG_THR_G
+#define MPU6050_STATIONARY_ACCEL_MAG_THR_G 0.10f
+#endif
+
+static float s_dmp_yaw_last_wrapped = 0.0f;
+static float s_dmp_yaw_unwrapped = 0.0f;
+static float s_dmp_yaw_offset = 0.0f;
+static bool s_yaw_unwrap_inited = false;
+
+static float s_dmp_yaw_unwrapped_last_stationary = 0.0f;
+static bool s_stationary_inited = false;
+
+static float wrap180f(float a)
+{
+    while (a > 180.0f) a -= 360.0f;
+    while (a < -180.0f) a += 360.0f;
+    return a;
+}
 
 /* LibDriver callbacks */
 static void a_receive_callback(uint8_t type) { }
@@ -120,11 +155,55 @@ static void mpu_reading_task(void *pvParameters) {
                                   &len);
         if (res == 0 && len > 0) {
             uint16_t idx = (uint16_t)(len - 1); /* use newest sample */
+
+            /* Update yaw unwrapping + stationary drift compensation (task context). */
+            float dmp_yaw_wrapped = gs_yaw[idx];
+            if (!s_yaw_unwrap_inited) {
+                s_dmp_yaw_last_wrapped = dmp_yaw_wrapped;
+                s_dmp_yaw_unwrapped = dmp_yaw_wrapped;
+                s_dmp_yaw_offset = 0.0f;
+                s_yaw_unwrap_inited = true;
+            } else {
+                float dy = wrap180f(dmp_yaw_wrapped - s_dmp_yaw_last_wrapped);
+                s_dmp_yaw_unwrapped += dy;
+                s_dmp_yaw_last_wrapped = dmp_yaw_wrapped;
+            }
+
+            /* Stationary detection from latest DMP-derived accel/gyro (already scaled). */
+            const float gx = gs_gyro_dps[idx][0];
+            const float gy = gs_gyro_dps[idx][1];
+            const float gz = gs_gyro_dps[idx][2];
+            const float ax = gs_accel_g[idx][0];
+            const float ay = gs_accel_g[idx][1];
+            const float az = gs_accel_g[idx][2];
+
+            const float gyro_abs_sum = fabsf(gx) + fabsf(gy) + fabsf(gz);
+            const float accel_mag = sqrtf(ax * ax + ay * ay + az * az);
+            const bool is_stationary = (gyro_abs_sum < MPU6050_STATIONARY_GYRO_THR_DPS) &&
+                                       (fabsf(accel_mag - 1.0f) < MPU6050_STATIONARY_ACCEL_MAG_THR_G);
+
+            if (is_stationary) {
+                /* Absorb any DMP yaw drift into offset so reported yaw stays fixed. */
+                /* (Offset update is based on unwrapped yaw, so no wrap jumps.) */
+                if (!s_stationary_inited) {
+                    s_dmp_yaw_unwrapped_last_stationary = s_dmp_yaw_unwrapped;
+                    s_stationary_inited = true;
+                } else {
+                    float du = s_dmp_yaw_unwrapped - s_dmp_yaw_unwrapped_last_stationary;
+                    s_dmp_yaw_offset += du;
+                    s_dmp_yaw_unwrapped_last_stationary = s_dmp_yaw_unwrapped;
+                }
+            } else {
+                /* Motion detected: re-arm stationary initialization. */
+                s_stationary_inited = false;
+            }
+
+            const float yaw_corrected = s_dmp_yaw_unwrapped - s_dmp_yaw_offset;
             // Update cached values safely
             portENTER_CRITICAL(&mpu_data_mutex);
             curr_pitch = gs_pitch[idx];
             curr_roll = gs_roll[idx];
-            curr_yaw = gs_yaw[idx];
+            curr_yaw = yaw_corrected;
             curr_accel_g[0] = gs_accel_g[idx][0];
             curr_accel_g[1] = gs_accel_g[idx][1];
             curr_accel_g[2] = gs_accel_g[idx][2];
@@ -158,6 +237,14 @@ int mpu6050_controller_init(void) {
         ESP_LOGE(TAG, "mpu6050_dmp_init failed.");
         g_gpio_irq = NULL;
         return 1;
+    }
+
+    /* Apply mounting/orientation matrix (defaults to identity). */
+    {
+        static const int8_t s_orientation[9] = MPU6050_GYRO_ORIENTATION_MATRIX;
+        if (mpu6050_dmp_set_orientation_matrix(s_orientation) != 0) {
+            ESP_LOGW(TAG, "MPU6050 DMP orientation matrix set failed (using default).");
+        }
     }
 
     (void)gpio_intr_enable(INTERRUPT_MPU6050_IO);

@@ -5,11 +5,7 @@
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
-/**
- * @brief user include header file
- */
 #include "driver_pca9685_basic.h"
-#include "robot_kinematics.h"
 #include "robot_controller.h"
 #include "sensor_mpu6050.h"
 
@@ -68,49 +64,73 @@ static void i2c_scanner(void) {
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "PCA9685 basic demo starting...");
+    ESP_LOGI(TAG, "Robot Maze Solver - PID Turning Test");
 
-    /* 1) Initialize the shared I2C bus (ESP-IDF v5.x i2c_master) */
+    /* 1) Khởi tạo I2C */
     i2c_bus_init();
-    if (i2c_bus_handle == NULL)
-    {
-        ESP_LOGE(TAG, "I2C init failed, cannot continue.");
-        return;
-    }
-    
-    // // Scan for devices before initializing drivers to see hardware reality
-    // i2c_scanner();
+    if (i2c_bus_handle == NULL) return;
 
-    /* 2) Initialize robot kinematics */
+    /* 2) Khởi tạo động học */
     kinematics_init();
 
-    /* 3) Initialize MPU6050 DMP */
+    /* 3) Khởi tạo MPU6050 DMP */
     if (mpu6050_controller_init() != 0) {
         ESP_LOGE(TAG, "MPU6050 initialization failed.");
+        return;
     }
 
-    /* 4) Start robot control task */
+    /* 4) Chạy task điều khiển */
     robot_controller_task_start();
 
-    // Example sequence
+    // Đợi 5 giây để cảm biến DMP ổn định hoàn toàn và triệt tiêu trôi (drift) ban đầu
+    ESP_LOGW(TAG, "Waiting for DMP stabilization (5s)...");
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    ESP_LOGI(TAG, "Starting Test Sequence.");
+
     while (1) {
-        // // Move forward
-        // ESP_LOGI(TAG, "Moving forward");
-        // robot_controller_set_velocity(0.8f, 0.0f);
+        float p, r, y;
+        mpu6050_get_euler_angles(&p, &r, &y);
+        ESP_LOGI(TAG, "Current Yaw: %.2f", y);
+        vTaskDelay(pdMS_TO_TICKS(200));
+
+        // // --- TEST XOAY TRÁI 90 ĐỘ ---
+        // ESP_LOGW(TAG, ">>>>> COMMAND: TURN LEFT 90 DEGREES <<<<<");
+        // robot_turn_relative(90.0f);
+        
+        // // In góc liên tục trong 3 giây để quan sát quá trình xoay
+        // for(int i = 0; i < 30; i++) {
+        //     mpu6050_get_euler_angles(&p, &r, &y);
+        //     ESP_LOGI(TAG, "Current Yaw: %.2f", y);
+        //     vTaskDelay(pdMS_TO_TICKS(100));
+        // }
+
+        // // Dừng lại 2 giây để quan sát kết quả cuối cùng
+        // ESP_LOGI(TAG, "Pause...");
+        // vTaskDelay(pdMS_TO_TICKS(2000));
+
+        // // --- TEST XOAY PHẢI 90 ĐỘ ---
+        // ESP_LOGW(TAG, ">>>>> COMMAND: TURN RIGHT 90 DEGREES <<<<<");
+        // robot_turn_relative(-90.0f);
+        
+        // for(int i = 0; i < 30; i++) {
+        //     mpu6050_get_euler_angles(&p, &r, &y);
+        //     ESP_LOGI(TAG, "Current Yaw: %.2f", y);
+        //     vTaskDelay(pdMS_TO_TICKS(100));
+        // }
+
+        // ESP_LOGI(TAG, "Pause...");
         // vTaskDelay(pdMS_TO_TICKS(2000));
         
-        float pitch, roll, yaw;
-        mpu6050_get_euler_angles(&pitch, &roll, &yaw);
-        ESP_LOGI(TAG, "Robot Angle: Pitch=%.2f, Roll=%.2f, Yaw=%.2f", pitch, roll, yaw);
-
-        // Stop
-        ESP_LOGI(TAG, "Stopping");
-        robot_controller_set_velocity(0.0f, 0.0f);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-        // // Spin
-        // ESP_LOGI(TAG, "Spinning");
-        // robot_controller_set_velocity(0.0f, 10.0f);
+        // // --- TEST ĐI THẲNG 2 GIÂY (GIỮ HƯỚNG) ---
+        // ESP_LOGW(TAG, ">>>>> COMMAND: DRIVE STRAIGHT <<<<<");
+        // robot_drive_straight(0.3f); // Đi chậm 0.3 m/s để test PID giữ hướng
+        // for(int i = 0; i < 20; i++) {
+        //     mpu6050_get_euler_angles(&p, &r, &y);
+        //     ESP_LOGI(TAG, "Straight Path - Yaw: %.2f", y);
+        //     vTaskDelay(pdMS_TO_TICKS(100));
+        // }
+        
+        // robot_controller_set_velocity(0.0f, 0.0f); // Dừng robot
         // vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }

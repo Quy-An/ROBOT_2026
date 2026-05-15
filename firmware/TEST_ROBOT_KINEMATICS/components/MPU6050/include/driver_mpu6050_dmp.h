@@ -123,6 +123,27 @@ uint8_t mpu6050_dmp_init(mpu6050_address_t addr_pin,
 uint8_t mpu6050_dmp_deinit(void);
 
 /**
+ * @brief     Set DMP orientation (mounting) matrix.
+ *
+ * This matrix must match how the MPU6050 is mounted on the robot.
+ * If the matrix is wrong, yaw/pitch/roll can be swapped, inverted, or have
+ * incorrect magnitude relative to the robot's physical motion.
+ *
+ * The matrix is a 3x3 rotation matrix with elements in {-1, 0, 1}:
+ *
+ *  [ m[0] m[1] m[2] ]
+ *  [ m[3] m[4] m[5] ]
+ *  [ m[6] m[7] m[8] ]
+ *
+ * @param[in] matrix Pointer to 9-element int8_t matrix
+ * @return    status code
+ *            - 0 success
+ *            - 1 failed
+ * @note      Call after mpu6050_dmp_init().
+ */
+uint8_t mpu6050_dmp_set_orientation_matrix(const int8_t matrix[9]);
+
+/**
  * @brief         dmp example read
  * @param[out]    *accel_raw pointer to an accel raw buffer
  * @param[out]    *accel_g pointer to an accel g buffer

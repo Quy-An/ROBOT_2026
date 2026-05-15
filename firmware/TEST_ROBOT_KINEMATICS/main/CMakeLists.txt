@@ -1,5 +1,12 @@
+set(srcs 
+    "main.c" 
+    "robot_controller.c" 
+    "sensor_mpu6050.c" 
+    "pid_control.c"
+)
+
 idf_component_register(
-    SRCS "robot_kinematics.c" "robot_controller.c" "sensor_mpu6050.c" "main.c"
+    SRCS ${srcs}
     INCLUDE_DIRS "."
     REQUIRES 
         esp_driver_i2c 

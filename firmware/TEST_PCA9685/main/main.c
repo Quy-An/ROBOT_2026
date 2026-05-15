@@ -120,58 +120,58 @@ void app_main(void)
     while (1) {
         // 1. Forward (Tiến)
         ESP_LOGI(TAG, "Action: FORWARD (Tiến)");
-        motor_control(95.0f, 95.0f); // 100% max speed
+        motor_control(10.0f, 10.0f); // 100% max speed
         vTaskDelay(pdMS_TO_TICKS(2000));
 
-        // Stop
-        ESP_LOGI(TAG, "Action: STOP");
-        motor_control(0.0f, 0.0f);
-            vTaskDelay(pdMS_TO_TICKS(1000));
+        // // Stop
+        // ESP_LOGI(TAG, "Action: STOP");
+        // motor_control(0.0f, 0.0f);
+        //     vTaskDelay(pdMS_TO_TICKS(1000));
 
-        // 2. Backward (Lùi)
-        ESP_LOGI(TAG, "Action: BACKWARD (Lùi)");
-        motor_control(-95.0f, -95.0f);
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        // // 2. Backward (Lùi)
+        // ESP_LOGI(TAG, "Action: BACKWARD (Lùi)");
+        // motor_control(-95.0f, -95.0f);
+        // vTaskDelay(pdMS_TO_TICKS(2000));
 
-        // Stop
-        ESP_LOGI(TAG, "Action: STOP");
-        motor_control(0.0f, 0.0f);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // // Stop
+        // ESP_LOGI(TAG, "Action: STOP");
+        // motor_control(0.0f, 0.0f);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
 
-        // 3. Pivot Left (Xoay trái, quay tại chỗ)
-        ESP_LOGI(TAG, "Action: PIVOT LEFT (Xoay trái)");
-        motor_control(-40.0f, 40.0f); // Trái lùi, phải tiến
-        vTaskDelay(pdMS_TO_TICKS(1500));
+        // // 3. Pivot Left (Xoay trái, quay tại chỗ)
+        // ESP_LOGI(TAG, "Action: PIVOT LEFT (Xoay trái)");
+        // motor_control(-40.0f, 40.0f); // Trái lùi, phải tiến
+        // vTaskDelay(pdMS_TO_TICKS(1500));
 
-        // Stop
-        ESP_LOGI(TAG, "Action: STOP");
-        motor_control(0.0f, 0.0f);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // // Stop
+        // ESP_LOGI(TAG, "Action: STOP");
+        // motor_control(0.0f, 0.0f);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
 
-        // 4. Pivot Right (Xoay phải, quay tại chỗ)
-        ESP_LOGI(TAG, "Action: PIVOT RIGHT (Xoay phải)");
-        motor_control(40.0f, -40.0f); // Trái tiến, phải lùi
-        vTaskDelay(pdMS_TO_TICKS(1500));
+        // // 4. Pivot Right (Xoay phải, quay tại chỗ)
+        // ESP_LOGI(TAG, "Action: PIVOT RIGHT (Xoay phải)");
+        // motor_control(40.0f, -40.0f); // Trái tiến, phải lùi
+        // vTaskDelay(pdMS_TO_TICKS(1500));
 
-        // Stop
-        ESP_LOGI(TAG, "Action: STOP");
-        motor_control(0.0f, 0.0f);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // // Stop
+        // ESP_LOGI(TAG, "Action: STOP");
+        // motor_control(0.0f, 0.0f);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
 
-        // 5. Turn Left (Rẽ trái khi tiến)
-        ESP_LOGI(TAG, "Action: TURN LEFT (Rẽ trái)");
-        motor_control(20.0f, 60.0f); // Bánh trái chậm, phải nhanh
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        // // 5. Turn Left (Rẽ trái khi tiến)
+        // ESP_LOGI(TAG, "Action: TURN LEFT (Rẽ trái)");
+        // motor_control(20.0f, 60.0f); // Bánh trái chậm, phải nhanh
+        // vTaskDelay(pdMS_TO_TICKS(2000));
 
-        // Stop
-        ESP_LOGI(TAG, "Action: STOP");
-        motor_control(0.0f, 0.0f);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // // Stop
+        // ESP_LOGI(TAG, "Action: STOP");
+        // motor_control(0.0f, 0.0f);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
 
-        // 6. Turn Right (Rẽ phải khi tiến)
-        ESP_LOGI(TAG, "Action: TURN RIGHT (Rẽ phải)");
-        motor_control(60.0f, 20.0f); // Bánh trái nhanh, phải chậm
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        // // 6. Turn Right (Rẽ phải khi tiến)
+        // ESP_LOGI(TAG, "Action: TURN RIGHT (Rẽ phải)");
+        // motor_control(60.0f, 20.0f); // Bánh trái nhanh, phải chậm
+        // vTaskDelay(pdMS_TO_TICKS(2000));
 
         // Stop
         ESP_LOGI(TAG, "Action: STOP");

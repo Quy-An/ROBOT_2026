@@ -39,6 +39,31 @@
 static mpu6050_handle_t gs_handle;        /**< mpu6050 handle */
 
 /**
+ * @brief     Set DMP orientation (mounting) matrix.
+ * @param[in] matrix Pointer to 9-element int8_t matrix
+ * @return    status code
+ *            - 0 success
+ *            - 1 failed
+ * @note      Call after mpu6050_dmp_init().
+ */
+uint8_t mpu6050_dmp_set_orientation_matrix(const int8_t matrix[9])
+{
+    if (matrix == NULL)
+    {
+        return 1;
+    }
+
+    /* Require init + dmp init so orientation write targets valid DMP memory. */
+    if (gs_handle.inited != 1 || gs_handle.dmp_inited != 1)
+    {
+        return 1;
+    }
+
+    /* Underlying API expects non-const pointer. It does not modify the array. */
+    return mpu6050_dmp_set_orientation(&gs_handle, (int8_t *)matrix);
+}
+
+/**
  * @brief  dmp irq
  * @return status code
  *         - 0 success

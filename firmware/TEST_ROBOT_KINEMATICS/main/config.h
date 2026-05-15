@@ -25,6 +25,19 @@
 #define MPU6050_POLL_PERIOD_MS      10
 
 /**
+ * @brief MPU6050 mounting / orientation matrix for DMP
+ *
+ * Default is identity (sensor axes match robot axes).
+ * If your yaw magnitude/sign is wrong (e.g. turn 90 deg but yaw ~45 deg),
+ * very often the sensor is mounted with axes swapped/inverted.
+ *
+ * Matrix elements must be in {-1, 0, 1}.
+ */
+#ifndef MPU6050_GYRO_ORIENTATION_MATRIX
+#define MPU6050_GYRO_ORIENTATION_MATRIX { 1, 0, 0, 0, 1, 0, 0, 0, 1 }
+#endif
+
+/**
  * @brief identify the IOs connected to the peripheral.
  */
 #define XSHUT_FRONT_IO                  GPIO_NUM_23     // XSHUT pin of the front VL53L0X
