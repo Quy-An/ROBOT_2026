@@ -92,7 +92,7 @@ void vl53l0x_poll_task(void *pvParameters) {
 
 void print_summary_task(void *pvParameters) {
     while (1) {
-        printf("[FRONT:%4umm | FL:%4umm | FR:%4umm | LEFT:%4umm | RIGHT:%4umm]\n",
+        printf("[FRONT:%4umm | FRONT_LEFT:%4umm | FRONT_RIGHT:%4umm | LEFT:%4umm | RIGHT:%4umm]\n",
             sensor_distances[0],
             sensor_distances[1],
             sensor_distances[2],
