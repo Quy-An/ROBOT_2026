@@ -69,7 +69,6 @@ void vl53l0x_sensor_task(void *pvParameters) {
     }
 }
 
-// --- Task poll cho LEFT ---
 void vl53l0x_poll_task(void *pvParameters) {
     sensor_cfg_t *s = (sensor_cfg_t *)pvParameters;
     VL53L0X_RangingMeasurementData_t data;
