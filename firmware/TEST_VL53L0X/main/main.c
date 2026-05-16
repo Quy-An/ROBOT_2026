@@ -98,7 +98,7 @@ void print_summary_task(void *pvParameters) {
             sensor_distances[3],
             sensor_distances[4]
         );
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -171,23 +171,17 @@ void init_sensors_sequence(void) {
             VL53L0X_INTERRUPTPOLARITY_LOW);
 
         VL53L0X_SetDeviceMode(s->dev, VL53L0X_DEVICEMODE_CONTINUOUS_TIMED_RANGING);
-        VL53L0X_SetInterMeasurementPeriodMilliSeconds(s->dev, 2000);
+        VL53L0X_SetInterMeasurementPeriodMilliSeconds(s->dev, 100);
 
         VL53L0X_StartMeasurement(s->dev);
         VL53L0X_ClearInterruptMask(s->dev, 0);
 
-        if (s->id != 3) {
-            gpio_isr_handler_add(s->int_io, vl53l0x_isr_handler, (void*)s);
-        }
+        // Gắn ISR cho tất cả cảm biến
+        gpio_isr_handler_add(s->int_io, vl53l0x_isr_handler, (void*)s);
 
         char task_name[16];
         snprintf(task_name, sizeof(task_name), "ToF_%s", s->name);
-
-        if (s->id == 3) {
-            xTaskCreate(vl53l0x_poll_task, task_name, 3072, (void*)s, 5, NULL);
-        } else {
-            xTaskCreate(vl53l0x_sensor_task, task_name, 3072, (void*)s, 5, NULL);
-        }
+        xTaskCreate(vl53l0x_sensor_task, task_name, 3072, (void*)s, 5, NULL);
 
         ESP_LOGI(TAG, "[%s] OK tại 0x%02x", s->name, s->target_addr);
     }
@@ -203,6 +197,6 @@ void app_main(void) {
     ESP_LOGI(TAG, "Hệ thống đang chạy...");
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
