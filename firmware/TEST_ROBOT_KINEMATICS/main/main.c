@@ -8,6 +8,7 @@
 #include "driver_pca9685_basic.h"
 #include "robot_controller.h"
 #include "sensor_mpu6050.h"
+#include "sensor_task.h"
 
 /**
  * @brief  TAG for logging
